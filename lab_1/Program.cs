@@ -1,4 +1,5 @@
 using Lab1.Common;
+using Lab1.Tasks;
 
 if (args.Length == 0)
 {
@@ -16,6 +17,10 @@ switch (args[0].ToLowerInvariant())
 
     case "split":
         DataGenerator.SplitFile();
+        break;
+
+    case "1a":
+        int threads = args.Length > 1 ? int.Parse(args[1]) : 4; Metric.Measure($"Task 1a ({threads} threads)", () => Task1a.Run("numbers.txt", threads));
         break;
 
     default:
