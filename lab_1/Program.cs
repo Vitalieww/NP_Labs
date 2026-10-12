@@ -23,6 +23,10 @@ switch (args[0].ToLowerInvariant())
         int threads = args.Length > 1 ? int.Parse(args[1]) : 4; Metric.Measure($"Task 1a ({threads} threads)", () => Task1a.Run("numbers.txt", threads));
         break;
 
+    case "1b":
+        Task1b.Run();
+        break;
+
     default:
         Console.WriteLine($"Unknown command: {args[0]}");
         break;
