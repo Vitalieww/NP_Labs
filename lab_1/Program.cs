@@ -32,6 +32,12 @@ switch (args[0].ToLowerInvariant())
         Metric.Measure($"Task 1c {workers} workers", () => Task1c.Run("numbers.txt", workers));
         break;
 
+    case "2":
+        string dir = args.Length > 1 ? args[1] : "parts";
+        int t2Threads = args.Length > 2 ? int.Parse(args[2]) : 4;
+        Metric.Measure($"Task 2 ({t2Threads} threads on '{dir}')", () => Task2.Run(dir, t2Threads));
+        break;
+
     default:
         Console.WriteLine($"Unknown command: {args[0]}");
         break;
