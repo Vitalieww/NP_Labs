@@ -27,6 +27,11 @@ switch (args[0].ToLowerInvariant())
         Task1b.Run();
         break;
 
+    case "1c":
+        int workers = args.Length > 1 ? int.Parse(args[1]) : 4;
+        Metric.Measure($"Task 1c {workers} workers", () => Task1c.Run("numbers.txt", workers));
+        break;
+
     default:
         Console.WriteLine($"Unknown command: {args[0]}");
         break;
