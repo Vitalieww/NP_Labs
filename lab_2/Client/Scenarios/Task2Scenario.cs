@@ -28,6 +28,8 @@ namespace lab_2.Client
                 }));
             }
             await Task.WhenAll(clientTasks);
+            Console.WriteLine("Now running last croissant battle");
+            await RunLastCroissantBattle();
         }
 
 
@@ -48,6 +50,48 @@ namespace lab_2.Client
             order.Add("Croissant", croissantAmount);
 
             return order;
+        }
+        private async Task RunLastCroissantBattle()
+        {
+            // We made an order to have all the croissants in the menu
+            MessageFramer messageFramer0 = Client.CreateClientFramer();
+            await Client.RequestMenu(messageFramer0);
+            NetworkMessage? message = await messageFramer0.ReceiveMessageAsync();
+            MenuResponse payload = message.Payload.ToObject<MenuResponse>();
+            int croissantCount = payload.Menu["Croissant"];
+            Dictionary<string, int> order0 = new()
+            { ["Croissant"] = croissantCount - 1 };
+            await Client.MakeOrder(messageFramer0, order0);
+            await messageFramer0.ReceiveMessageAsync();
+            await Client.RequestMenu(messageFramer0);
+            await messageFramer0.ReceiveMessageAsync();
+            // ----------------------------------- 
+
+            //Run 2 clients at same time to fight over last croissant
+            var startingGate = new TaskCompletionSource();
+            Dictionary<string, int> orderCroissant = new()
+            { ["Croissant"] = 1 };
+            List<Task> clientTasks = [];
+            for (int i = 0; i < 2; i++)
+            {
+                int clientId = i;
+                clientTasks.Add(Task.Run(async () =>
+                {
+                    MessageFramer messageFramer = Client.CreateClientFramer();
+                    var buzzer = new TaskCompletionSource();
+                    ClientConnectionHandler connectionHandler = new();
+                    _ = Task.Run(() => connectionHandler.Handle(messageFramer, clientId, buzzer));
+                    await startingGate.Task;
+                    await Client.MakeOrder(messageFramer, orderCroissant);
+                    await buzzer.Task;
+                }));
+            }
+            await Task.Delay(50); // Let both runners line up
+            startingGate.SetResult();
+            await Task.WhenAll(clientTasks);
+
+
+
         }
     }
 }
