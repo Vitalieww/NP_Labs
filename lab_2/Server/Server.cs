@@ -32,7 +32,7 @@ namespace lab_2.Server
             for (int i = 0; i < workerCount; i++)
             {
                 int workerId = i + 1;
-                Task.Run(() => WorkerLoop(workerId));
+                await Task.Run(() => WorkerLoop(workerId));
             }
             while (true)
             {
@@ -59,6 +59,7 @@ namespace lab_2.Server
                     Type = MessageTypes.OrderReady,
                     Payload = JToken.FromObject(orderReady)
                 };
+                if (job.UserFramer == null) break;
                 await job.UserFramer.SendMessageAsync(message);
                 Console.WriteLine($"[Worker {workerId}] Order #{job.OrderId} is ready and delivered!");
             }
@@ -70,7 +71,7 @@ namespace lab_2.Server
     {
         public int OrderId { get; set; }
         public int PreparationTime { get; set; }
-        public MessageFramer UserFramer { get; set; }
+        public MessageFramer? UserFramer { get; set; }
         public Dictionary<string, int> Items { get; set; } = [];
     }
 }

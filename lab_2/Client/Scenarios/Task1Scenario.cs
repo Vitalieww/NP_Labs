@@ -19,9 +19,9 @@ namespace lab_2.Client
                 Type = MessageTypes.MenuRequest
             };
             await messageFramer.SendMessageAsync(networkMessage);
-            NetworkMessage messageResponse = await messageFramer.ReceiveMessageAsync();
-            MenuResponse menuResponse = messageResponse.Payload.ToObject<MenuResponse>();
-            foreach (var kvp in menuResponse.Menu)
+            NetworkMessage? messageResponse = await messageFramer.ReceiveMessageAsync();
+            MenuResponse? menuResponse = messageResponse!.Payload!.ToObject<MenuResponse>();
+            foreach (var kvp in menuResponse!.Menu)
             {
                 Console.WriteLine($"Key: {kvp.Key}, Value: {kvp.Value}");
             }
@@ -40,8 +40,8 @@ namespace lab_2.Client
                 Payload = JToken.FromObject(orderRequest)
             };
             await messageFramer.SendMessageAsync(networkMessageOrderRequest);
-            NetworkMessage message = await messageFramer.ReceiveMessageAsync();
-            Console.WriteLine(message.Payload);
+            NetworkMessage? message = await messageFramer.ReceiveMessageAsync();
+            Console.WriteLine(message!.Payload);
         }
     }
 }

@@ -18,7 +18,7 @@ namespace lab_2
             {
                 if (args[1] == "task1")
                 {
-                    Task1.Run();
+                    await Task1.Run();
                 }
                 else if (args[1] == "task2")
                 {

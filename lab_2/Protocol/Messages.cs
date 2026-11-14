@@ -48,7 +48,7 @@ namespace lab_2.Protocol
                 if (index != -1)
                 {
                     message = _stringBuffer.ToString(0, index);
-                    NetworkMessage npMessage = JsonConvert.DeserializeObject<NetworkMessage>(message);
+                    NetworkMessage? npMessage = JsonConvert.DeserializeObject<NetworkMessage>(message);
                     _stringBuffer = _stringBuffer.Remove(0, index + 1);
                     return npMessage;
                 }
@@ -110,7 +110,7 @@ namespace lab_2.Protocol
     public class OrderReady
     {
         public int OrderId;
-        public string OrderDoneMessage;
+        public string OrderDoneMessage { get; set; } = string.Empty;
     }
 
     public class ProviderDelivery
@@ -126,6 +126,6 @@ namespace lab_2.Protocol
 
     public class Error
     {
-        public string ErrorMessage;
+        public string ErrorMessage { get; set; } = string.Empty;
     }
 }

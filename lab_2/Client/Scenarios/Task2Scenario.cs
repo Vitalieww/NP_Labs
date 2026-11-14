@@ -57,8 +57,8 @@ namespace lab_2.Client
             MessageFramer messageFramer0 = Client.CreateClientFramer();
             await Client.RequestMenu(messageFramer0);
             NetworkMessage? message = await messageFramer0.ReceiveMessageAsync();
-            MenuResponse payload = message.Payload.ToObject<MenuResponse>();
-            int croissantCount = payload.Menu["Croissant"];
+            MenuResponse? payload = message!.Payload?.ToObject<MenuResponse>();
+            int croissantCount = payload!.Menu["Croissant"];
             Dictionary<string, int> order0 = new()
             { ["Croissant"] = croissantCount - 1 };
             await Client.MakeOrder(messageFramer0, order0);

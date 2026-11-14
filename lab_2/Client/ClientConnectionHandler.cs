@@ -24,13 +24,15 @@ namespace lab_2.Client
                 {
                     case MessageTypes.MenuResponse:
                         {
-                            MenuResponse payload = message.Payload.ToObject<MenuResponse>();
+                            MenuResponse? payload = message.Payload?.ToObject<MenuResponse>();
+                            if (payload == null) break;
                             Console.WriteLine($"[Client #{clientId}] Current menu: {string.Join(", ", payload.Menu.Select(kvp => $"{kvp.Key}: {kvp.Value}"))} ");
                             break;
                         }
                     case MessageTypes.OrderResponse:
                         {
-                            OrderResponse payload = message.Payload.ToObject<OrderResponse>();
+                            OrderResponse? payload = message.Payload?.ToObject<OrderResponse>();
+                            if (payload == null) break;
                             if (payload.Success)
                             {
                                 Console.WriteLine($"[Client #{clientId}] Order #{payload.OrderId} time ({payload.PreparationTime}s)");
@@ -45,7 +47,8 @@ namespace lab_2.Client
                         }
                     case MessageTypes.OrderReady:
                         {
-                            OrderReady payload = message.Payload.ToObject<OrderReady>();
+                            OrderReady? payload = message.Payload?.ToObject<OrderReady>();
+                            if (payload == null) break;
                             Console.WriteLine($"[Client #{clientId}] {payload.OrderDoneMessage}");
                             buzzer.SetResult();
                             break;

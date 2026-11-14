@@ -38,7 +38,8 @@ namespace lab_2.Server
 
                 if (message.Type == MessageTypes.OrderRequest)
                 {
-                    OrderRequest orderRequest = message.Payload.ToObject<OrderRequest>();
+                    OrderRequest? orderRequest = message.Payload?.ToObject<OrderRequest>();
+                    if (orderRequest == null) continue;
                     bool responseSuccess = inventory.TryDeduct(orderRequest.Order);
                     OrderResponse orderResponse = new();
                     NetworkMessage networkMessage = new()
