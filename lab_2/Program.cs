@@ -1,6 +1,7 @@
 ﻿using System;
 using lab_2.Server;
 using lab_2.Client;
+
 namespace lab_2
 {
     class Program
@@ -18,6 +19,11 @@ namespace lab_2
                 if (args[1] == "task1")
                 {
                     Task1.Run();
+                }
+                else if (args[1] == "task2")
+                {
+                    var task2 = new Task2();
+                    await task2.Run();
                 }
             }
         }

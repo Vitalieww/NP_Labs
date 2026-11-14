@@ -3,10 +3,11 @@ using System.Net.Sockets;
 using System.Text;
 using lab_2.Protocol;
 using Newtonsoft.Json.Linq;
+using System.Collections.Concurrent;
 
 namespace lab_2.Server
 {
-    public class ConnectionHandler(Inventory inventory)
+    public class ServerConnectionHandler(Inventory inventory, BlockingCollection<OrderJob> orderQueue)
     {
         public async Task Handle(Socket clientSocket)
         {
@@ -14,7 +15,7 @@ namespace lab_2.Server
 
             while (true)
             {
-                NetworkMessage? message = framer.ReceiveMessage();
+                NetworkMessage? message = await framer.ReceiveMessageAsync();
                 if (message == null)
                 {
                     // Client disconnected!
@@ -32,7 +33,7 @@ namespace lab_2.Server
                         Type = MessageTypes.MenuResponse,
                         Payload = JToken.FromObject(menuResponse)
                     };
-                    framer.SendMessage(networkMessage);
+                    await framer.SendMessageAsync(networkMessage);
                 }
 
                 if (message.Type == MessageTypes.OrderRequest)
@@ -50,8 +51,9 @@ namespace lab_2.Server
                         orderResponse.ErrorMessage = "Order refused: Insufficient stock or invalid item";
                         orderResponse.RemainingStock = inventory.GetStock();
                         networkMessage.Payload = JToken.FromObject(orderResponse);
-                        framer.SendMessage(networkMessage);
-                        Console.WriteLine($"Fail: Order -> {orderRequest.Order}...{clientSocket.RemoteEndPoint}");
+                        await framer.SendMessageAsync(networkMessage);
+                        Console.WriteLine($"The menu: {string.Join(", ", orderResponse.RemainingStock.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}");
+                        Console.WriteLine($"Fail: Order -> {string.Join(", ", orderRequest.Order.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}...{clientSocket.RemoteEndPoint}");
                     }
                     else
                     {
@@ -60,25 +62,16 @@ namespace lab_2.Server
                         orderResponse.PreparationTime = inventory.PrepareOrder(orderRequest.Order);
                         orderResponse.RemainingStock = inventory.GetStock();
                         networkMessage.Payload = JToken.FromObject(orderResponse);
-                        framer.SendMessage(networkMessage);
-                        Console.WriteLine($"Success: Order {orderResponse.OrderId}, prep time:{orderResponse.PreparationTime}...{clientSocket.RemoteEndPoint}");
-                        _ = Task.Run(async () =>
+                        await framer.SendMessageAsync(networkMessage);
+                        orderQueue.Add(new OrderJob
                         {
-                            await Task.Delay(orderResponse.PreparationTime * 1000);
-                            OrderReady orderReady = new()
-                            {
-                                OrderId = orderResponse.OrderId,
-                            };
-                            orderReady.OrderDoneMessage = $"Order with orderID {orderReady.OrderId}";
-                            NetworkMessage messageOrderReady = new()
-                            {
-                                Type = MessageTypes.OrderReady,
-                                Payload = JToken.FromObject(orderReady)
-                            };
-                            framer.SendMessage(messageOrderReady);
-                            Console.WriteLine($"Order {orderReady.OrderId} is ready. ... {clientSocket.RemoteEndPoint}");
+                            OrderId = orderResponse.OrderId,
+                            PreparationTime = orderResponse.PreparationTime,
+                            UserFramer = framer,
+                            Items = orderRequest.Order
                         });
                     }
+                    ;
 
                 }
 

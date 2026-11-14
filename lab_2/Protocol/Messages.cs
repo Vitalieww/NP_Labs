@@ -18,18 +18,27 @@ namespace lab_2.Protocol
 
     public class MessageFramer(Socket socket)
     {
+        private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
         private readonly Socket _socket = socket;
         private StringBuilder _stringBuffer = new();
 
-        public void SendMessage(NetworkMessage msg)
+        public async Task SendMessageAsync(NetworkMessage msg, CancellationToken cancellationToken = default)
         {
             string messageString = JsonConvert.SerializeObject(msg);
             messageString = string.Concat(messageString, "\n");
             byte[] messageBytes = Encoding.UTF8.GetBytes(messageString);
-            _socket.Send(messageBytes);
+            await _semaphore.WaitAsync(cancellationToken);
+            try
+            {
+                await _socket.SendAsync(messageBytes, cancellationToken);
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
         }
 
-        public NetworkMessage? ReceiveMessage()
+        public async Task<NetworkMessage?> ReceiveMessageAsync()
         {
             byte[] byteBuffer = new byte[1024];
             string message;
@@ -43,7 +52,7 @@ namespace lab_2.Protocol
                     _stringBuffer = _stringBuffer.Remove(0, index + 1);
                     return npMessage;
                 }
-                int bytesRead = _socket.Receive(byteBuffer);
+                int bytesRead = await _socket.ReceiveAsync(byteBuffer);
                 if (bytesRead == 0)
                 {
                     return null;
