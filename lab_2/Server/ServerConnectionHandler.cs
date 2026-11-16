@@ -9,15 +9,23 @@ namespace lab_2.Server
 {
     public class ServerConnectionHandler(Inventory inventory, BlockingCollection<OrderJob> orderQueue)
     {
+        private MessageFramer? _providerFramer;
         public async Task Handle(Socket clientSocket)
         {
             var framer = new MessageFramer(clientSocket);
+            bool isProvider = false;
 
             while (true)
             {
                 NetworkMessage? message = await framer.ReceiveMessageAsync();
                 if (message == null)
                 {
+                    if (isProvider) //Provider disconnected
+                    {
+                        _providerFramer = null;
+                        isProvider = false;
+                        Console.WriteLine("Provider disconnected.");
+                    }
                     // Client disconnected!
                     break;
                 }
@@ -76,8 +84,32 @@ namespace lab_2.Server
 
                 }
 
+                if (message.Type == MessageTypes.RegisterProvider)
+                {
+                    _providerFramer = framer;
+                    isProvider = true;
+                }
+
                 if (message.Type == MessageTypes.ProviderDelivery)
-                { }
+                {
+                    if (isProvider)
+                    {
+                        ProviderDelivery? delivery = message.Payload?.ToObject<ProviderDelivery>();
+                        Dictionary<string, int>? products = delivery?.Products;
+                        inventory.TryAdd(products);
+                    }
+                    else
+                    {
+                        Error errorProviderMessage = new()
+                        { ErrorMessage = "Not a provider!" };
+                        NetworkMessage networkMessage = new()
+                        {
+                            Type = MessageTypes.Error,
+                            Payload = JToken.FromObject(errorProviderMessage)
+                        };
+                        await framer.SendMessageAsync(networkMessage);
+                    }
+                }
 
             }
         }

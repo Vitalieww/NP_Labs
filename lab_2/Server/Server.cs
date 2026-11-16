@@ -22,6 +22,7 @@ namespace lab_2.Server
         {
             _inventory = new Inventory();
             _connectionHandler = new ServerConnectionHandler(_inventory, _orderQueue);
+
         }
         public async Task RunListener()
         {
@@ -32,7 +33,7 @@ namespace lab_2.Server
             for (int i = 0; i < workerCount; i++)
             {
                 int workerId = i + 1;
-                await Task.Run(() => WorkerLoop(workerId));
+                _ = Task.Run(() => WorkerLoop(workerId));
             }
             while (true)
             {
@@ -64,6 +65,7 @@ namespace lab_2.Server
                 Console.WriteLine($"[Worker {workerId}] Order #{job.OrderId} is ready and delivered!");
             }
         }
+
 
     }
 

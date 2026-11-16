@@ -86,6 +86,8 @@ namespace lab_2.Protocol
         public const string OrderReady = "ORDER_RED";
         public const string ProviderDelivery = "PROV_DELIV";
         public const string LowStockAlert = "LOW_STOCK";
+        public const string RegisterProvider = "REG_PROV";
+        public const string Error = "ERROR";
 
     }
     public class OrderRequest
@@ -127,5 +129,10 @@ namespace lab_2.Protocol
     public class Error
     {
         public string ErrorMessage { get; set; } = string.Empty;
+    }
+
+    public class RegisterProvider
+    {
+        
     }
 }

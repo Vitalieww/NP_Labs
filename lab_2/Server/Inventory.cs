@@ -56,6 +56,37 @@ namespace lab_2.Server
 
             }
         }
+        public bool TryAdd(Dictionary<string, int> delivery)
+        {
+            lock (_lock)
+            {
+                foreach (var kvp in delivery)
+                {
+                    string deliveryItem = kvp.Key;
+                    int deliveryAmount = kvp.Value;
+                    if (deliveryAmount > 0)
+                    {
+                        if (_stock.ContainsKey(deliveryItem))
+                        {
+                            continue;
+                        }
+
+                    }
+                    return false;
+                }
+                foreach (var kvp in delivery)
+                {
+
+                    string deliveryItem = kvp.Key;
+                    int deliveryAmount = kvp.Value;
+
+                    _stock[deliveryItem] = _stock[deliveryItem] + deliveryAmount;
+
+                }
+                return true;
+
+            }
+        }
         public int PrepareOrder(Dictionary<string, int> order)
         {
             Dictionary<string, int> itemsPreparationTime = new()
