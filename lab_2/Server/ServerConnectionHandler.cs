@@ -79,6 +79,8 @@ namespace lab_2.Server
                             UserFramer = framer,
                             Items = orderRequest.Order
                         });
+                        //Now check if there are any items < 5
+                        await CheckLowStock();
                     }
                     ;
 
@@ -88,6 +90,7 @@ namespace lab_2.Server
                 {
                     _providerFramer = framer;
                     isProvider = true;
+                    await CheckLowStock();
                 }
 
                 if (message.Type == MessageTypes.ProviderDelivery)
@@ -97,6 +100,7 @@ namespace lab_2.Server
                         ProviderDelivery? delivery = message.Payload?.ToObject<ProviderDelivery>();
                         Dictionary<string, int>? products = delivery?.Products;
                         inventory.TryAdd(products);
+                        Console.WriteLine($"[Delivery] Restocked products from {clientSocket.RemoteEndPoint}");
                     }
                     else
                     {
@@ -111,6 +115,31 @@ namespace lab_2.Server
                     }
                 }
 
+            }
+        }
+
+        private async Task CheckLowStock()
+        {
+            //Now check if there are any items < 5
+            foreach (KeyValuePair<string, int> item in inventory.GetStock())
+            {
+                if (item.Value < 5)
+                {
+                    if (_providerFramer != null)
+                    {
+                        LowStockAlert lowStockAlert = new()
+                        {
+                            RemainingStock = inventory.GetStock()
+                        };
+                        NetworkMessage messageLowStock = new()
+                        {
+                            Type = MessageTypes.LowStockAlert,
+                            Payload = JToken.FromObject(lowStockAlert)
+                        };
+                        await _providerFramer.SendMessageAsync(messageLowStock);
+                        break;
+                    }
+                }
             }
         }
     }

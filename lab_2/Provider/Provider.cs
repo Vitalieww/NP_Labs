@@ -7,11 +7,11 @@ using System.Collections.Concurrent;
 
 namespace lab_2.Provider
 {
-    public class Provider
+    public class CoffeeShopProvider
     {
         public MessageFramer Framer;
 
-        public Provider()
+        public CoffeeShopProvider()
         {
             Framer = CreateProviderFramer();
         }

@@ -1,6 +1,7 @@
 ﻿using System;
 using lab_2.Server;
 using lab_2.Client;
+using lab_2.Provider;
 
 namespace lab_2
 {
@@ -25,6 +26,12 @@ namespace lab_2
                     var task2 = new Task2();
                     await task2.Run();
                 }
+            }
+            else if (args[0] == "provider")
+            {
+                var provider = new CoffeeShopProvider();
+                await provider.LogProvider();
+                await provider.WaitForAlert();
             }
         }
     }
