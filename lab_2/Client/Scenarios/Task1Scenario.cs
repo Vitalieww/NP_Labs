@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using lab_2.Client;
 using lab_2.Protocol;
 using Newtonsoft.Json.Linq;
 
@@ -11,37 +12,16 @@ namespace lab_2.Client
     {
         public static async Task Run()
         {
-            Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            socket.Connect(new IPEndPoint(IPAddress.Loopback, 5050));
-            MessageFramer messageFramer = new(socket);
-            NetworkMessage networkMessage = new()
-            {
-                Type = MessageTypes.MenuRequest
-            };
-            await messageFramer.SendMessageAsync(networkMessage);
-            NetworkMessage? messageResponse = await messageFramer.ReceiveMessageAsync();
-            MenuResponse? menuResponse = messageResponse!.Payload!.ToObject<MenuResponse>();
-            foreach (var kvp in menuResponse!.Menu)
-            {
-                Console.WriteLine($"Key: {kvp.Key}, Value: {kvp.Value}");
-            }
+            CoffeeShopClient client = new(0);
+            await client.RequestMenu();
+            await client.ListenAsync();
 
-            OrderRequest orderRequest = new()
+            Dictionary<string, int> order = new()
             {
-                Order =
-                {
-                    ["Coffee"] = 1,
-                    ["Croissant"] = 2
-                }
+                ["Coffee"] = 1,
+                ["Croissant"] = 2
             };
-            NetworkMessage networkMessageOrderRequest = new()
-            {
-                Type = MessageTypes.OrderRequest,
-                Payload = JToken.FromObject(orderRequest)
-            };
-            await messageFramer.SendMessageAsync(networkMessageOrderRequest);
-            NetworkMessage? message = await messageFramer.ReceiveMessageAsync();
-            Console.WriteLine(message!.Payload);
+            await client.MakeOrder(order);
         }
     }
 }

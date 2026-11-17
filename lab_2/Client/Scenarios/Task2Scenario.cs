@@ -17,14 +17,12 @@ namespace lab_2.Client
                 int clientId = i;
                 clientTasks.Add(Task.Run(async () =>
                 {
-                    MessageFramer messageFramer = Client.CreateClientFramer();
+                    CoffeeShopClient client = new(clientId);
+                    _ = Task.Run(() => client.ListenAsync());
                     var buzzer = new TaskCompletionSource();
-                    ClientConnectionHandler connectionHandler = new();
-                    _ = Task.Run(() => connectionHandler.Handle(messageFramer, clientId, buzzer));
-                    // await Client.RequestMenu(messageFramer);
-                    await Client.MakeOrder(messageFramer, CreateRandomOrder());
-                    await Client.RequestMenu(messageFramer);
-                    await buzzer.Task;
+                    await client.MakeOrder(CreateRandomOrder());
+                    await client.RequestMenu();
+                    await client.OrderBuzzer.Task;
                 }));
             }
             await Task.WhenAll(clientTasks);
@@ -54,17 +52,15 @@ namespace lab_2.Client
         private async Task RunLastCroissantBattle()
         {
             // We made an order to have all the croissants in the menu
-            MessageFramer messageFramer0 = Client.CreateClientFramer();
-            await Client.RequestMenu(messageFramer0);
-            NetworkMessage? message = await messageFramer0.ReceiveMessageAsync();
+            CoffeeShopClient client = new(0);
+            await client.RequestMenu();
+            NetworkMessage? message = await client.Framer.ReceiveMessageAsync();
             MenuResponse? payload = message!.Payload?.ToObject<MenuResponse>();
             int croissantCount = payload!.Menu["Croissant"];
             Dictionary<string, int> order0 = new()
             { ["Croissant"] = croissantCount - 1 };
-            await Client.MakeOrder(messageFramer0, order0);
-            await messageFramer0.ReceiveMessageAsync();
-            await Client.RequestMenu(messageFramer0);
-            await messageFramer0.ReceiveMessageAsync();
+            await client.MakeOrder(order0);
+            await client.RequestMenu();
             // ----------------------------------- 
 
             //Run 2 clients at same time to fight over last croissant
@@ -72,18 +68,17 @@ namespace lab_2.Client
             Dictionary<string, int> orderCroissant = new()
             { ["Croissant"] = 1 };
             List<Task> clientTasks = [];
-            for (int i = 0; i < 2; i++)
+            for (int i = 1; i < 3; i++)
             {
                 int clientId = i;
                 clientTasks.Add(Task.Run(async () =>
                 {
-                    MessageFramer messageFramer = Client.CreateClientFramer();
+                    var client = new CoffeeShopClient(clientId);
                     var buzzer = new TaskCompletionSource();
-                    ClientConnectionHandler connectionHandler = new();
-                    _ = Task.Run(() => connectionHandler.Handle(messageFramer, clientId, buzzer));
+                    _ = Task.Run(() => client.ListenAsync());
                     await startingGate.Task;
-                    await Client.MakeOrder(messageFramer, orderCroissant);
-                    await buzzer.Task;
+                    await client.MakeOrder(orderCroissant);
+                    await client.OrderBuzzer.Task;
                 }));
             }
             await Task.Delay(50); // Let both runners line up
