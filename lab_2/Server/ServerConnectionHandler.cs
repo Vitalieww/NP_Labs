@@ -13,6 +13,7 @@ namespace lab_2.Server
         public async Task Handle(Socket clientSocket)
         {
             var framer = new MessageFramer(clientSocket);
+            var cts = new CancellationTokenSource();
             bool isProvider = false;
 
             while (true)
@@ -27,94 +28,111 @@ namespace lab_2.Server
                         Console.WriteLine("Provider disconnected.");
                     }
                     // Client disconnected!
+                    cts.Cancel();
                     break;
                 }
-
-                if (message.Type == MessageTypes.MenuRequest)
+                else
                 {
-                    MenuResponse menuResponse = new()
+                    if (message.Type == MessageTypes.MenuRequest)
                     {
-                        Menu = inventory.GetStock()
-                    };
-                    NetworkMessage networkMessage = new()
-                    {
-                        Type = MessageTypes.MenuResponse,
-                        Payload = JToken.FromObject(menuResponse)
-                    };
-                    await framer.SendMessageAsync(networkMessage);
-                }
-
-                if (message.Type == MessageTypes.OrderRequest)
-                {
-                    OrderRequest? orderRequest = message.Payload?.ToObject<OrderRequest>();
-                    if (orderRequest == null) continue;
-                    bool responseSuccess = inventory.TryDeduct(orderRequest.Order);
-                    OrderResponse orderResponse = new();
-                    NetworkMessage networkMessage = new()
-                    {
-                        Type = MessageTypes.OrderResponse
-                    };
-                    if (!responseSuccess)
-                    {
-                        orderResponse.Success = false;
-                        orderResponse.ErrorMessage = "Order refused: Insufficient stock or invalid item";
-                        orderResponse.RemainingStock = inventory.GetStock();
-                        networkMessage.Payload = JToken.FromObject(orderResponse);
-                        await framer.SendMessageAsync(networkMessage);
-                        Console.WriteLine($"The menu: {string.Join(", ", orderResponse.RemainingStock.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}");
-                        Console.WriteLine($"Fail: Order -> {string.Join(", ", orderRequest.Order.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}...{clientSocket.RemoteEndPoint}");
-                    }
-                    else
-                    {
-                        orderResponse.OrderId = inventory.GetId();
-                        orderResponse.Success = true;
-                        orderResponse.PreparationTime = inventory.PrepareOrder(orderRequest.Order);
-                        orderResponse.RemainingStock = inventory.GetStock();
-                        networkMessage.Payload = JToken.FromObject(orderResponse);
-                        await framer.SendMessageAsync(networkMessage);
-                        orderQueue.Add(new OrderJob
+                        MenuResponse menuResponse = new()
                         {
-                            OrderId = orderResponse.OrderId,
-                            PreparationTime = orderResponse.PreparationTime,
-                            UserFramer = framer,
-                            Items = orderRequest.Order
-                        });
-                        //Now check if there are any items < 5
+                            Menu = inventory.GetStock()
+                        };
+                        NetworkMessage networkMessage = new()
+                        {
+                            Type = MessageTypes.MenuResponse,
+                            Payload = JToken.FromObject(menuResponse)
+                        };
+                        await framer.SendMessageAsync(networkMessage);
+                    }
+
+                    else if (message.Type == MessageTypes.OrderRequest)
+                    {
+                        OrderRequest? orderRequest = message.Payload?.ToObject<OrderRequest>();
+                        if (orderRequest == null) continue;
+                        bool responseSuccess = inventory.TryDeduct(orderRequest.Order);
+                        OrderResponse orderResponse = new();
+                        NetworkMessage networkMessage = new()
+                        {
+                            Type = MessageTypes.OrderResponse
+                        };
+                        if (!responseSuccess)
+                        {
+                            orderResponse.Success = false;
+                            orderResponse.ErrorMessage = "Order refused: Insufficient stock or invalid item";
+                            orderResponse.RemainingStock = inventory.GetStock();
+                            networkMessage.Payload = JToken.FromObject(orderResponse);
+                            await framer.SendMessageAsync(networkMessage);
+                            Console.WriteLine($"The menu: {string.Join(", ", orderResponse.RemainingStock.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}");
+                            Console.WriteLine($"Fail: Order -> {string.Join(", ", orderRequest.Order.Select(kvp => $"{kvp.Key}: {kvp.Value}"))}...{clientSocket.RemoteEndPoint}");
+                        }
+                        else
+                        {
+                            orderResponse.OrderId = inventory.GetId();
+                            orderResponse.Success = true;
+                            orderResponse.PreparationTime = inventory.PrepareOrder(orderRequest.Order);
+                            orderResponse.RemainingStock = inventory.GetStock();
+                            networkMessage.Payload = JToken.FromObject(orderResponse);
+                            await framer.SendMessageAsync(networkMessage);
+                            orderQueue.Add(new OrderJob
+                            {
+                                OrderId = orderResponse.OrderId,
+                                PreparationTime = orderResponse.PreparationTime,
+                                UserFramer = framer,
+                                Items = orderRequest.Order,
+                                CancelToken = cts.Token
+                            });
+                            //Now check if there are any items < 5
+                            await CheckLowStock();
+                        }
+                        ;
+
+                    }
+
+                    else if (message.Type == MessageTypes.RegisterProvider)
+                    {
+                        _providerFramer = framer;
+                        isProvider = true;
                         await CheckLowStock();
                     }
-                    ;
 
-                }
-
-                if (message.Type == MessageTypes.RegisterProvider)
-                {
-                    _providerFramer = framer;
-                    isProvider = true;
-                    await CheckLowStock();
-                }
-
-                if (message.Type == MessageTypes.ProviderDelivery)
-                {
-                    if (isProvider)
+                    else if (message.Type == MessageTypes.ProviderDelivery)
                     {
-                        ProviderDelivery? delivery = message.Payload?.ToObject<ProviderDelivery>();
-                        Dictionary<string, int>? products = delivery?.Products;
-                        inventory.TryAdd(products);
-                        Console.WriteLine($"[Delivery] Restocked products from {clientSocket.RemoteEndPoint}");
+                        if (isProvider)
+                        {
+                            ProviderDelivery? delivery = message.Payload?.ToObject<ProviderDelivery>();
+                            Dictionary<string, int>? products = delivery?.Products;
+                            if (products == null) break;
+                            inventory.TryAdd(products);
+                            Console.WriteLine($"[Delivery] Restocked products from {clientSocket.RemoteEndPoint}");
+                        }
+                        else
+                        {
+                            Error errorProviderMessage = new()
+                            { ErrorMessage = "Not a provider!" };
+                            NetworkMessage networkMessage = new()
+                            {
+                                Type = MessageTypes.Error,
+                                Payload = JToken.FromObject(errorProviderMessage)
+                            };
+                            await framer.SendMessageAsync(networkMessage);
+                        }
                     }
                     else
                     {
-                        Error errorProviderMessage = new()
-                        { ErrorMessage = "Not a provider!" };
+                        Error invalidCommand = new()
+                        {
+                            ErrorMessage = "Unknown command!"
+                        };
                         NetworkMessage networkMessage = new()
                         {
                             Type = MessageTypes.Error,
-                            Payload = JToken.FromObject(errorProviderMessage)
+                            Payload = JToken.FromObject(invalidCommand)
                         };
                         await framer.SendMessageAsync(networkMessage);
                     }
                 }
-
             }
         }
 

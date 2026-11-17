@@ -22,6 +22,25 @@ namespace lab_2.Protocol
         private readonly Socket _socket = socket;
         private StringBuilder _stringBuffer = new();
 
+        public void Disconnect()
+        {
+            try
+            {
+                if (_socket.Connected)
+                {
+                    _socket.Shutdown(SocketShutdown.Both);
+                }
+            }
+            catch
+            {
+                // Socket may already be disconnected or in invalid state
+            }
+            finally
+            {
+                _socket.Close();
+            }
+        }
+
         public async Task SendMessageAsync(NetworkMessage msg, CancellationToken cancellationToken = default)
         {
             string messageString = JsonConvert.SerializeObject(msg);
@@ -48,9 +67,28 @@ namespace lab_2.Protocol
                 if (index != -1)
                 {
                     message = _stringBuffer.ToString(0, index);
-                    NetworkMessage? npMessage = JsonConvert.DeserializeObject<NetworkMessage>(message);
-                    _stringBuffer = _stringBuffer.Remove(0, index + 1);
-                    return npMessage;
+                    NetworkMessage? npMessage;
+                    try
+                    {
+                        npMessage = JsonConvert.DeserializeObject<NetworkMessage>(message);
+                        _stringBuffer = _stringBuffer.Remove(0, index + 1);
+                        return npMessage;
+                    }
+                    catch (Exception ex) when (ex is JsonReaderException or JsonSerializationException)
+                    {
+                        Error invalidCommand = new()
+                        {
+                            ErrorMessage = "Unknown JSON!"
+                        };
+                        NetworkMessage networkMessage = new()
+                        {
+                            Type = MessageTypes.Error,
+                            Payload = JToken.FromObject(invalidCommand)
+                        };
+                        _stringBuffer = _stringBuffer.Remove(0, index + 1);
+                        await SendMessageAsync(networkMessage);
+                        continue;
+                    }
                 }
                 int bytesRead = await _socket.ReceiveAsync(byteBuffer);
                 if (bytesRead == 0)
@@ -58,6 +96,20 @@ namespace lab_2.Protocol
                     return null;
                 }
                 _stringBuffer.Append(Encoding.UTF8.GetString(byteBuffer, 0, bytesRead));
+                if (_stringBuffer.Length > (64 * 1024)) // 65,536 bytes)
+                {
+                    Error messageLenghtExceeded = new()
+                    {
+                        ErrorMessage = "Message too long!"
+                    };
+                    NetworkMessage networkMessage = new()
+                    {
+                        Type = MessageTypes.Error,
+                        Payload = JToken.FromObject(messageLenghtExceeded)
+                    };
+                    await SendMessageAsync(networkMessage);
+                    _stringBuffer.Remove(0, _stringBuffer.Length);
+                }
             }
 
         }
@@ -133,6 +185,6 @@ namespace lab_2.Protocol
 
     public class RegisterProvider
     {
-        
+
     }
 }

@@ -12,22 +12,22 @@ namespace lab_2.Server
 {
     public class CoffeeShopServer
     {
-
-        const int PORT = 5050;
         private readonly Inventory _inventory;
         private readonly ServerConnectionHandler _connectionHandler;
         private readonly BlockingCollection<OrderJob> _orderQueue = new();
 
-        public CoffeeShopServer()
+        public CoffeeShopServer(int port = 5050)
         {
             _inventory = new Inventory();
             _connectionHandler = new ServerConnectionHandler(_inventory, _orderQueue);
-
+            Port = port;
         }
+        private int Port { get; }
+
         public async Task RunListener()
         {
             Socket listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            listener.Bind(new IPEndPoint(IPAddress.Loopback, PORT));
+            listener.Bind(new IPEndPoint(IPAddress.Any, Port));
             listener.Listen();
             int workerCount = Environment.ProcessorCount;
             for (int i = 0; i < workerCount; i++)
@@ -48,8 +48,24 @@ namespace lab_2.Server
             while (true)
             {
                 OrderJob job = _orderQueue.Take();
+                if (job.CancelToken.IsCancellationRequested)
+                {
+                    _inventory.TryAdd(job.Items);
+                    continue; // Skip cooking and grab the next job!
+                }
+
                 Console.WriteLine($"[Worker {workerId}] Preparing Order #{job.OrderId} ({job.PreparationTime}s)...");
-                Thread.Sleep(job.PreparationTime * 1000);
+                try
+                {
+                    await Task.Delay(job.PreparationTime * 1000, job.CancelToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    // The customer vanished while we were cooking!
+                    _inventory.TryAdd(job.Items);
+                    Console.WriteLine($"[Worker {workerId}] Order #{job.OrderId} cancelled. Stock returned.");
+                    continue;
+                }
                 OrderReady orderReady = new()
                 {
                     OrderId = job.OrderId,
@@ -75,5 +91,6 @@ namespace lab_2.Server
         public int PreparationTime { get; set; }
         public MessageFramer? UserFramer { get; set; }
         public Dictionary<string, int> Items { get; set; } = [];
+        public CancellationToken CancelToken { get; set; }
     }
 }

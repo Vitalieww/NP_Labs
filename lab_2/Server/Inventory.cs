@@ -1,22 +1,40 @@
 
+using Newtonsoft.Json;
 
 namespace lab_2.Server
 {
     public class Inventory
     {
+        private const string StockFilePath = "stock.json";
         private readonly object _lock = new();
         private int orderId = 0;
-        private Dictionary<string, int> _stock = new()
+        private Dictionary<string, int> _stock;
+
+        public Inventory()
         {
-            ["Coffee"] = Random.Shared.Next(10, 51),
-            ["Tea"] = Random.Shared.Next(10, 51),
-            ["Croissant"] = Random.Shared.Next(10, 51)
-        };
+            if (File.Exists(StockFilePath))
+            {
+                string serializedStock = File.ReadAllText(StockFilePath);
+                var loaded = JsonConvert.DeserializeObject<Dictionary<string, int>>(serializedStock)
+                    ?? throw new InvalidDataException("Stock file does not contain a valid inventory.");
+                _stock = new Dictionary<string, int>(loaded, StringComparer.OrdinalIgnoreCase);
+            }
+            else
+            {
+                _stock = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Coffee"] = Random.Shared.Next(10, 51),
+                    ["Tea"] = Random.Shared.Next(10, 51),
+                    ["Croissant"] = Random.Shared.Next(10, 51)
+                };
+                SaveStockToFile();
+            }
+        }
         public Dictionary<string, int> GetStock()
         {
             lock (_lock)
             {
-                return new Dictionary<string, int>(_stock);
+                return new Dictionary<string, int>(_stock, StringComparer.OrdinalIgnoreCase);
             }
         }
 
@@ -52,6 +70,7 @@ namespace lab_2.Server
                     _stock[orderItem] = _stock[orderItem] - orderAmount;
 
                 }
+                SaveStockToFile();
                 return true;
 
             }
@@ -83,13 +102,19 @@ namespace lab_2.Server
                     _stock[deliveryItem] = _stock[deliveryItem] + deliveryAmount;
 
                 }
+                SaveStockToFile();
                 return true;
 
             }
         }
+
+        private void SaveStockToFile()
+        {
+            File.WriteAllText(StockFilePath, JsonConvert.SerializeObject(_stock, Formatting.Indented));
+        }
         public int PrepareOrder(Dictionary<string, int> order)
         {
-            Dictionary<string, int> itemsPreparationTime = new()
+            Dictionary<string, int> itemsPreparationTime = new(StringComparer.OrdinalIgnoreCase)
             {
                 ["Coffee"] = 4,
                 ["Tea"] = 3,
@@ -98,10 +123,16 @@ namespace lab_2.Server
             int totalTime = 0;
             foreach (var kvp in order)
             {
-
                 string orderItem = kvp.Key;
                 int orderAmount = kvp.Value;
-                totalTime += itemsPreparationTime[orderItem] * orderAmount;
+                if (itemsPreparationTime.TryGetValue(orderItem, out int timePerItem))
+                {
+                    totalTime += timePerItem * orderAmount;
+                }
+                else
+                {
+                    totalTime += 2 * orderAmount;
+                }
             }
 
             return totalTime;

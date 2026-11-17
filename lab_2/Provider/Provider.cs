@@ -11,16 +11,16 @@ namespace lab_2.Provider
     {
         public MessageFramer Framer;
 
-        public CoffeeShopProvider()
+        public CoffeeShopProvider(string ip = "127.0.0.1", int port = 5050)
         {
-            Framer = CreateProviderFramer();
+            Framer = CreateProviderFramer(ip, port);
         }
 
 
-        private MessageFramer CreateProviderFramer()
+        private MessageFramer CreateProviderFramer(string ip, int port)
         {
             Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            socket.Connect(new IPEndPoint(IPAddress.Loopback, 5050));
+            socket.Connect(new IPEndPoint(IPAddress.Parse(ip), port));
             MessageFramer messageFramer = new(socket);
             return messageFramer;
         }
@@ -36,37 +36,59 @@ namespace lab_2.Provider
 
         public async Task WaitForAlert()
         {
-            while (true)
+            try
             {
-                NetworkMessage? message = await Framer.ReceiveMessageAsync();
-                if (message == null)
+                while (true)
                 {
-                    // Server disconnected!
-                    break;
-                }
-
-                if (message.Type == MessageTypes.LowStockAlert)
-                {
-                    Dictionary<string, int> remainingStock = message.Payload.ToObject<LowStockAlert>().RemainingStock;
-                    Dictionary<string, int> stockFill = [];
-                    foreach (KeyValuePair<string, int> item in remainingStock)
+                    NetworkMessage? message = await Framer.ReceiveMessageAsync();
+                    if (message == null)
                     {
-                        if (item.Value < 5)
+                        Console.WriteLine("Server disconnected!");
+                        break;
+                    }
+
+                    if (message.Type == MessageTypes.LowStockAlert)
+                    {
+                        LowStockAlert? lowStockAlert = message.Payload?.ToObject<LowStockAlert>();
+                        Dictionary<string, int>? remainingStock = lowStockAlert?.RemainingStock;
+                        if (remainingStock == null) break;
+                        Dictionary<string, int> stockFill = [];
+                        foreach (KeyValuePair<string, int> item in remainingStock)
                         {
-                            stockFill[item.Key] = 20;
+                            if (item.Value < 5)
+                            {
+                                stockFill[item.Key] = 20;
+                            }
+                        }
+                        ProviderDelivery delivery = new()
+                        {
+                            Products = stockFill
+                        };
+                        NetworkMessage sendRestockMessage = new()
+                        {
+                            Type = MessageTypes.ProviderDelivery,
+                            Payload = JToken.FromObject(delivery)
+                        };
+                        await Framer.SendMessageAsync(sendRestockMessage);
+                        Console.WriteLine($"[Provider] Low stock detected. Restocked items: {string.Join(", ", stockFill.Select(kvp => $"{kvp.Key}: +{kvp.Value}"))}");
+                    }
+                    else if (message.Type == MessageTypes.Error)
+                    {
+                        Error? err = message.Payload?.ToObject<Error>();
+                        if (err != null)
+                        {
+                            Console.WriteLine($"[Provider] Error: {err.ErrorMessage}");
                         }
                     }
-                    ProviderDelivery delivery = new()
-                    {
-                        Products = stockFill
-                    };
-                    NetworkMessage sendRestockMessage = new()
-                    {
-                        Type = MessageTypes.ProviderDelivery,
-                        Payload = JToken.FromObject(delivery)
-                    };
-                    await Framer.SendMessageAsync(sendRestockMessage);
                 }
+            }
+            catch (SocketException)
+            {
+                Console.WriteLine("Server disconnected!");
+            }
+            catch (ObjectDisposedException)
+            {
+                // The connection was closed.
             }
         }
     }
