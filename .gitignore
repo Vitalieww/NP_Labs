@@ -96,3 +96,8 @@ Lab_papers/
 numbers.txt
 parts/
 
+# Runtime state / persisted data
+stock.json
+**/stock.json
+
+

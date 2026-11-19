@@ -5,7 +5,7 @@ namespace lab_2.Server
 {
     public class Inventory
     {
-        private const string StockFilePath = "stock.json";
+        private static readonly string StockFilePath = Directory.Exists("lab_2") ? Path.Combine("lab_2", "stock.json") : "stock.json";
         private readonly object _lock = new();
         private int orderId = 0;
         private Dictionary<string, int> _stock;
